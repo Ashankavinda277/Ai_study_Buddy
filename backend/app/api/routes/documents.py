@@ -6,6 +6,7 @@ from pypdf import PdfReader
 from app.db.session import get_db
 from app.models import Document, DocumentChunk
 from app.utils.text_processing import clean_text, chunk_text
+from app.vector_store import add_chunk_to_vector_store
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -81,6 +82,18 @@ def process_document(document_id: str, db: Session = Depends(get_db)):
                     sequence=sequence,
                 )
                 db.add(db_chunk)
+               
+                db.flush()  # so db_chunk.id is available before commit
+
+                add_chunk_to_vector_store(
+                    chunk_id=db_chunk.id,
+                    chunk_text=chunk,
+                    metadata={
+                        "document_id": document_id,
+                        "page_number": page_num,
+                        "filename": document.filename,
+                    },
+                )
                 sequence += 1
 
         document.status = "ready"

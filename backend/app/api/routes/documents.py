@@ -4,7 +4,9 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pypdf import PdfReader
 from app.db.session import get_db
-from app.models.document import Document
+from app.models import Document, DocumentChunk
+from app.utils.text_processing import clean_text, chunk_text
+from app.vector_store import add_chunk_to_vector_store
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -60,18 +62,49 @@ def process_document(document_id: str, db: Session = Depends(get_db)):
         db.commit()
 
         reader = PdfReader(document.filepath)
-        extracted_text = ""
-        for page in reader.pages:
-            extracted_text += (page.extract_text() or "") + "\n"
+
+        # Delete old chunks if reprocessing
+        db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).delete()
+
+        sequence = 0
+        for page_num, page in enumerate(reader.pages, start=1):
+            raw_text = page.extract_text() or ""
+            cleaned = clean_text(raw_text)
+            if not cleaned:
+                continue
+
+            page_chunks = chunk_text(cleaned)
+            for chunk in page_chunks:
+                db_chunk = DocumentChunk(
+                    document_id=document_id,
+                    chunk_text=chunk,
+                    page_number=page_num,
+                    sequence=sequence,
+                )
+                db.add(db_chunk)
+               
+                db.flush()  # so db_chunk.id is available before commit
+
+                add_chunk_to_vector_store(
+                    chunk_id=db_chunk.id,
+                    chunk_text=chunk,
+                    metadata={
+                        "document_id": document_id,
+                        "page_number": page_num,
+                        "filename": document.filename,
+                    },
+                )
+                sequence += 1
 
         document.status = "ready"
         db.commit()
 
+        total_chunks = db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).count()
+
         return {
             "id": document.id,
             "status": document.status,
-            "text_preview": extracted_text[:500],  # just show first 500 chars for now
-            "total_characters": len(extracted_text),
+            "total_chunks": total_chunks,
         }
 
     except Exception as e:

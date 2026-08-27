@@ -19,6 +19,7 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 from app.db.database import Base
+from app.models.document import Document  # noqa: F401  (registers table on Base.metadata)
 
 target_metadata = Base.metadata
 

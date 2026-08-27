@@ -21,7 +21,8 @@ if config.config_file_name is not None:
 from app.db.database import Base
 from app.models.document import Document  # noqa: F401  (registers table on Base.metadata)
 from app.models.document_chunk import DocumentChunk  # noqa: F401  (registers table on Base.metadata)
-
+from app.models.chatsession import ChatSession  # noqa: F401  (registers table on Base.metadata)
+from app.models.chatmessage import ChatMessage  # noqa: F401  (registers table on Base.metadata)
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

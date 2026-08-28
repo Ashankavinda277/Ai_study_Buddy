@@ -5,9 +5,9 @@ from fastapi import HTTPException
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
 
-from app.models import Document, DocumentChunk
+from app.models import ChatMessage, ChatSession, Document, DocumentChunk
 from app.utils.text_processing import clean_text, chunk_text
-from app.vector_store import add_chunk_to_vector_store
+from app.vector_store import add_chunk_to_vector_store, delete_chunks_for_document
 
 UPLOAD_DIR = "uploaded_files"
 ALLOWED_TYPES = ["application/pdf"]
@@ -107,7 +107,19 @@ def list_all_documents(db: Session) -> list[Document]:
 
 
 def delete_document(db: Session, document: Document) -> None:
+    session_ids = [
+        row.id
+        for row in db.query(ChatSession.id).filter(ChatSession.document_id == document.id).all()
+    ]
+    if session_ids:
+        db.query(ChatMessage).filter(ChatMessage.session_id.in_(session_ids)).delete()
+        db.query(ChatSession).filter(ChatSession.id.in_(session_ids)).delete()
+
+    db.query(DocumentChunk).filter(DocumentChunk.document_id == document.id).delete()
+    delete_chunks_for_document(document.id)
+
     if os.path.exists(document.filepath):
         os.remove(document.filepath)
+
     db.delete(document)
     db.commit()

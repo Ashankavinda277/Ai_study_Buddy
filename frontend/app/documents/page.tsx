@@ -17,8 +17,13 @@ export default function DocumentsPage() {
   const [uploading, setUploading] = useState(false);
 
   const fetchDocuments = async () => {
-    const data = await listDocuments();
-    setDocuments(data);
+    try {
+      const data = await listDocuments();
+      setDocuments(data);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load documents");
+    }
   };
 
   useEffect(() => {
@@ -43,8 +48,13 @@ export default function DocumentsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteDocument(id);
-    await fetchDocuments();
+    try {
+      await deleteDocument(id);
+      await fetchDocuments();
+    } catch (err) {
+      console.error(err);
+      alert("Delete failed");
+    }
   };
 
   return (

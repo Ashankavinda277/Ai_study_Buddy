@@ -60,6 +60,13 @@ def save_chat_turn(db: Session, session: ChatSession, question: str, answer: str
     db.commit()
 
 
+def list_chat_sessions(db: Session, document_id: str | None) -> list[ChatSession]:
+    query = db.query(ChatSession)
+    if document_id:
+        query = query.filter(ChatSession.document_id == document_id)
+    return query.order_by(ChatSession.created_at.desc()).all()
+
+
 def get_session_history(db: Session, session_id: str) -> list[dict]:
     messages = (
         db.query(ChatMessage)

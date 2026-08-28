@@ -32,6 +32,25 @@ export type AskResponse = {
   sources: ChatSource[];
 };
 
+export type ChatSessionSummary = {
+  id: string;
+  document_id: string;
+  title: string | null;
+  created_at: string;
+};
+
+export type ChatMessage = {
+  role: string;
+  content: string;
+  sources: ChatSource[] | null;
+  created_at: string;
+};
+
+export type ChatHistory = {
+  session_id: string;
+  messages: ChatMessage[];
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -124,5 +143,20 @@ export function askQuestion(question: string, documentId: string, sessionId?: st
       document_id: documentId,
       session_id: sessionId ?? null,
     }),
+  });
+}
+
+export function listChatSessions(documentId?: string) {
+  const query = documentId ? `?document_id=${encodeURIComponent(documentId)}` : "";
+  return request<ChatSessionSummary[]>(`/chat/sessions${query}`);
+}
+
+export function getChatHistory(sessionId: string) {
+  return request<ChatHistory>(`/chat/sessions/${sessionId}`);
+}
+
+export function deleteChatSession(sessionId: string) {
+  return request<{ message: string }>(`/chat/sessions/${sessionId}`, {
+    method: "DELETE",
   });
 }

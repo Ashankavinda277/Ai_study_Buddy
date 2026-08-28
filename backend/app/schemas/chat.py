@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class AskRequest(BaseModel):
@@ -30,6 +30,15 @@ class ChatMessageResponse(BaseModel):
 class ChatHistoryResponse(BaseModel):
     session_id: str
     messages: list[ChatMessageResponse]
+
+
+class ChatSessionSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    document_id: str
+    title: str | None
+    created_at: datetime
 
 
 class ChatSessionDeleteResponse(BaseModel):

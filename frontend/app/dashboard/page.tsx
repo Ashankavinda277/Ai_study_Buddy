@@ -55,6 +55,19 @@ function DashboardContent() {
             Take quiz
           </Link>
         </div>
+
+        <div className="rounded-lg border border-black/10 p-6 dark:border-white/10">
+          <h2 className="font-medium">Quiz history</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Review your past attempts, scores, and AI feedback.
+          </p>
+          <Link
+            href="/attempts"
+            className="mt-4 inline-block rounded border border-black/15 px-4 py-2 text-sm dark:border-white/15"
+          >
+            View history
+          </Link>
+        </div>
       </div>
     </div>
   );

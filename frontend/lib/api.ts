@@ -119,6 +119,7 @@ export type AttemptDetail = {
   score_percentage: number;
   performance_level: string;
   time_taken: number | null;
+  ai_feedback: string | null;
   completed_at: string;
   questions: QuestionReview[];
 };
@@ -170,4 +171,34 @@ export function generateQuiz(data: QuizGenerateRequest) {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export type AttemptSort = "newest" | "oldest" | "score";
+
+export type AttemptSummary = {
+  id: number;
+  quiz_id: number;
+  quiz_title: string;
+  document_filename: string;
+  topic: string | null;
+  difficulty: string;
+  score_percentage: number;
+  performance_level: string;
+  time_taken: number | null;
+  completed_at: string;
+};
+
+export function fetchAttempts(filters: {
+  document_id?: string;
+  topic?: string;
+  difficulty?: Difficulty;
+  sort?: AttemptSort;
+} = {}) {
+  const params = new URLSearchParams();
+  if (filters.document_id) params.set("document_id", filters.document_id);
+  if (filters.topic) params.set("topic", filters.topic);
+  if (filters.difficulty) params.set("difficulty", filters.difficulty);
+  if (filters.sort) params.set("sort", filters.sort);
+  const query = params.toString();
+  return request<AttemptSummary[]>(`/attempts${query ? `?${query}` : ""}`);
 }

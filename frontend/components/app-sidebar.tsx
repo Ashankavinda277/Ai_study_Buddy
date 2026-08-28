@@ -4,20 +4,18 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   GraduationCap,
+  HelpCircle,
   LayoutDashboard,
   ListChecks,
   LogOut,
   MessageSquare,
-  NotebookText,
-  Plus,
-  Settings,
   Sparkles,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
 import { listChatSessions, type ChatSessionSummary } from "@/lib/api";
 
-export type SidebarActiveKey = "dashboard" | "notes" | "chat" | "quiz";
+export type SidebarActiveKey = "dashboard" | "chat" | "quiz" | "progress" | "help";
 
 const NAV_ITEMS: {
   key: SidebarActiveKey;
@@ -26,14 +24,14 @@ const NAV_ITEMS: {
   href: string;
 }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/documents" },
-  { key: "notes", label: "My Notes", icon: NotebookText, href: "/documents" },
   { key: "chat", label: "AI Chat", icon: MessageSquare, href: "/chat" },
-  { key: "quiz", label: "Quiz Module", icon: ListChecks, href: "/documents" },
+  { key: "quiz", label: "Quiz Module", icon: ListChecks, href: "/quizzes/new" },
+  { key: "progress", label: "My Progress", icon: Sparkles, href: "/progress" },
 ];
 
 // Only these have a real destination today. Everything else is visually
 // present but not wired up yet.
-const REAL_KEYS: SidebarActiveKey[] = ["dashboard", "chat"];
+const REAL_KEYS: SidebarActiveKey[] = ["dashboard", "chat", "quiz", "progress"];
 
 const RECENTS_LIMIT = 6;
 
@@ -54,8 +52,9 @@ export function AppSidebar({ active }: { active: SidebarActiveKey }) {
   }
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-indigo-100 bg-white px-4 py-6 lg:flex">
+    <aside className="sticky top-0 h-screen hidden w-64 shrink-0 flex-col border-r border-indigo-100 bg-white px-4 py-6 lg:flex">
       <div className="flex items-center gap-2 px-2">
+
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-900">
           <GraduationCap className="h-5 w-5 text-white" />
         </div>
@@ -64,14 +63,6 @@ export function AppSidebar({ active }: { active: SidebarActiveKey }) {
           <p className="text-[11px] text-indigo-400">Academic Excellence</p>
         </div>
       </div>
-
-      <button
-        onClick={() => router.push("/documents")}
-        className="mt-6 flex items-center justify-center gap-1.5 rounded-full bg-indigo-900 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-colors hover:bg-indigo-800"
-      >
-        <Plus className="h-4 w-4" />
-        New Study Session
-      </button>
 
       <div className="mt-8 flex min-h-0 flex-1 flex-col overflow-y-auto">
         <nav className="flex flex-col gap-1">
@@ -145,20 +136,20 @@ export function AppSidebar({ active }: { active: SidebarActiveKey }) {
       </div>
 
       <div className="flex flex-col gap-1 border-t border-indigo-100 pt-4">
-        <span
-          title="Not available yet"
-          className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-indigo-300"
-        >
-          <Settings className="h-4 w-4" />
-          Settings
-        </span>
-        <span
-          title="Not available yet"
-          className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-indigo-300"
-        >
-          <Sparkles className="h-4 w-4" />
-          Help
-        </span>
+        {active === "help" ? (
+          <span className="flex items-center gap-2.5 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-900">
+            <HelpCircle className="h-4 w-4" />
+            Help
+          </span>
+        ) : (
+          <button
+            onClick={() => router.push("/help")}
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
+          >
+            <HelpCircle className="h-4 w-4" />
+            Help
+          </button>
+        )}
 
         <div className="mt-3 flex items-center gap-2 border-t border-indigo-100 pt-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-900 text-xs font-semibold text-white">
@@ -179,3 +170,4 @@ export function AppSidebar({ active }: { active: SidebarActiveKey }) {
     </aside>
   );
 }
+

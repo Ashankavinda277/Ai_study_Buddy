@@ -1,23 +1,27 @@
 "use client";
 
-import { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-export default function DashboardPage() {
+import { ProtectedRoute } from "@/components/protected-route";
+import { useAuth } from "@/lib/auth-context";
+
+function DashboardContent() {
+  const { user, logout } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    router.replace("/documents");
-  }, [router]);
+  async function handleLogout() {
+    await logout();
+    router.push("/login");
+  }
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-16">
-      <div className="flex flex-1 items-center justify-center"></div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Welcome, {user?.name}</h1>
         <button
           onClick={handleLogout}
-          className="rounded border border-black/15 px-4 py-2 text-sm dark:border-white/15"
+          className="rounded border border-black/15 px-4 py-2 text-sm dark:border-white/15 cursor-pointer"
         >
           Log out
         </button>
@@ -81,3 +85,12 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
+  );
+}
+

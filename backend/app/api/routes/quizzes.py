@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.database import get_db
-from app.models.document import Document
 from app.models.quiz import Quiz
 from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_question import QuizQuestion
@@ -19,14 +18,9 @@ from app.schemas.quiz import (
 )
 from app.services import retrieval_client
 from app.services.grading import GradableQuestion, SubmittedAnswer, grade_quiz
+from app.services.quiz_generator import QuizGenerationError, generate_quiz_content
 
 router = APIRouter(prefix="/quizzes", tags=["quizzes"])
-
-# Title of the hand-written quiz created by scripts/seed_quiz.py. Until real
-# AI generation (Feature 3) exists, /quizzes/generate clones this quiz's
-# questions so the configuration form and its loading/error states can be
-# built and tested end-to-end.
-SEED_QUIZ_TITLE = "Sample Quiz: Database Basics"
 
 
 def _get_owned_quiz(db: Session, quiz_id: int, user_id: int) -> Quiz:
@@ -36,30 +30,12 @@ def _get_owned_quiz(db: Session, quiz_id: int, user_id: int) -> Quiz:
     return quiz
 
 
-def _get_or_create_stub_document(db: Session) -> Document:
-    """Temporary document row so a generated Quiz can satisfy the
-    Quiz.document_id foreign key.
-
-    retrieval_client returns fake document ids that don't exist in the
-    real `documents` table yet, so we can't use them directly as the FK
-    value. This reuses the same placeholder row scripts/seed_quiz.py
-    creates. Once retrieval_client is wired up to Member 1's real
-    document endpoints, generated quizzes will point at real document
-    rows and this helper goes away.
-    """
-    document = db.query(Document).filter(Document.filename == "seed-document.txt").first()
-    if document is None:
-        document = Document(
-            filename="seed-document.txt", filepath="seed", status="ready", size_bytes=0
-        )
-        db.add(document)
-        db.flush()
-    return document
-
-
 @router.get("/documents", response_model=list[AvailableDocument])
-def list_available_documents(current_user: User = Depends(get_current_user)):
-    documents = retrieval_client.list_documents(current_user.id)
+def list_available_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    documents = retrieval_client.list_documents(db, current_user.id)
     return [
         AvailableDocument(id=doc.id, filename=doc.filename, status=doc.status)
         for doc in documents
@@ -72,58 +48,55 @@ def generate_quiz(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    available_document_ids = {doc.id for doc in retrieval_client.list_documents(current_user.id)}
+    available_document_ids = {doc.id for doc in retrieval_client.list_documents(db, current_user.id)}
     if payload.document_id not in available_document_ids:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    # No AI yet (that's Feature 3). For now, clone the seeded quiz's
-    # questions so this form and its loading/error states can be tested
-    # end-to-end without depending on Member 1 or an LLM being ready.
-    source_quiz = db.query(Quiz).filter(Quiz.title == SEED_QUIZ_TITLE).order_by(Quiz.id).first()
-    if source_quiz is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="No seed quiz found to clone. Run `python -m scripts.seed_quiz` first.",
-        )
-    source_questions = (
-        db.query(QuizQuestion)
-        .filter(QuizQuestion.quiz_id == source_quiz.id)
-        .order_by(QuizQuestion.id)
-        .all()
-    )
-
-    document = _get_or_create_stub_document(db)
-
+    # Row exists (status="pending") before the AI call so a crash mid-generation
+    # still leaves a record we can point at, per the Feature 4 failure flow.
     new_quiz = Quiz(
         user_id=current_user.id,
-        document_id=document.id,
-        title=f"{payload.topic or 'Quiz'} ({payload.difficulty.title()})",
+        document_id=payload.document_id,
+        title=payload.topic or "Untitled quiz",
         topic=payload.topic,
         difficulty=payload.difficulty,
         question_count=payload.question_count,
-        status="ready",
+        status="pending",
     )
     db.add(new_quiz)
-    db.flush()
+    db.commit()
+    db.refresh(new_quiz)
 
-    # Cycle through the seed questions to fill the requested count.
-    for i in range(payload.question_count):
-        source = source_questions[i % len(source_questions)]
+    try:
+        ai_quiz = generate_quiz_content(
+            document_id=payload.document_id,
+            topic=payload.topic,
+            difficulty=payload.difficulty,
+            question_count=payload.question_count,
+        )
+    except QuizGenerationError as e:
+        new_quiz.status = "failed"
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+
+    new_quiz.title = ai_quiz.title
+    new_quiz.status = "ready"
+    for question in ai_quiz.questions:
         db.add(
             QuizQuestion(
                 quiz_id=new_quiz.id,
-                question=source.question,
-                option_a=source.option_a,
-                option_b=source.option_b,
-                option_c=source.option_c,
-                option_d=source.option_d,
-                correct_answer=source.correct_answer,
-                explanation=source.explanation,
-                topic=source.topic,
-                difficulty=payload.difficulty,
+                question=question.question,
+                option_a=question.options[0],
+                option_b=question.options[1],
+                option_c=question.options[2],
+                option_d=question.options[3],
+                correct_answer=question.correct_answer,
+                explanation=question.explanation,
+                topic=question.topic,
+                difficulty=question.difficulty,
+                source_page=question.source_page,
             )
         )
-
     db.commit()
 
     return QuizGenerateResponse(quiz_id=new_quiz.id)

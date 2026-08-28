@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import attempts, auth, chat, documents, quizzes
+from app.api.routes import attempts, auth, chat, documents, progress, quizzes
 
 app = FastAPI(title="AI Study Buddy API")
 
@@ -20,6 +20,7 @@ app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(quizzes.router)
 app.include_router(attempts.router)
+app.include_router(progress.router)
 
 
 @app.get("/health")

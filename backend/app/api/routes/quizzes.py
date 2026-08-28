@@ -9,6 +9,7 @@ from app.models.quiz import Quiz
 from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_question import QuizQuestion
 from app.models.student_answer import StudentAnswer
+from app.models.topic_performance import TopicPerformance
 from app.models.user import User
 from app.schemas.quiz import (
     AvailableDocument,
@@ -179,6 +180,39 @@ def _generate_attempt_feedback(
         return None
 
 
+def _update_topic_performance(
+    db: Session, user_id: int, questions: list[QuizQuestion], result: GradingResult
+) -> None:
+    """Increments per-topic attempted/correct counts and recomputes accuracy,
+    in the same transaction as the submit (Feature 11). Cheaper than
+    recalculating from scratch on every dashboard load — each submission
+    just adds its own tally to the running total.
+    """
+    questions_by_id = {q.id: q for q in questions}
+
+    deltas: dict[str, dict[str, int]] = {}
+    for question_result in result.question_results:
+        topic = questions_by_id[question_result.question_id].topic or "General"
+        bucket = deltas.setdefault(topic, {"attempted": 0, "correct": 0})
+        bucket["attempted"] += 1
+        if question_result.is_correct:
+            bucket["correct"] += 1
+
+    for topic, delta in deltas.items():
+        row = (
+            db.query(TopicPerformance)
+            .filter(TopicPerformance.user_id == user_id, TopicPerformance.topic == topic)
+            .first()
+        )
+        if row is None:
+            row = TopicPerformance(user_id=user_id, topic=topic, total_attempted=0, total_correct=0)
+            db.add(row)
+
+        row.total_attempted += delta["attempted"]
+        row.total_correct += delta["correct"]
+        row.accuracy = round((row.total_correct / row.total_attempted) * 100, 2)
+
+
 @router.post("/{quiz_id}/submit", response_model=QuizSubmitResponse)
 def submit_quiz(
     quiz_id: int,
@@ -222,6 +256,7 @@ def submit_quiz(
         )
 
     attempt.ai_feedback = _generate_attempt_feedback(quiz, questions, result)
+    _update_topic_performance(db, current_user.id, questions, result)
 
     db.commit()
 

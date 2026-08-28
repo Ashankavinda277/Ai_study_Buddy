@@ -202,3 +202,48 @@ export function fetchAttempts(filters: {
   const query = params.toString();
   return request<AttemptSummary[]>(`/attempts${query ? `?${query}` : ""}`);
 }
+
+export type DifficultyPerformance = {
+  difficulty: string;
+  attempts: number;
+  average_score: number;
+};
+
+export type ScoreTrendPoint = {
+  attempt_id: number;
+  completed_at: string;
+  score_percentage: number;
+};
+
+export type ProgressSummary = {
+  total_quizzes_completed: number;
+  average_score: number;
+  best_score: number;
+  recent_score: number | null;
+  total_questions_answered: number;
+  correct_answer_percentage: number;
+  strongest_topic: string | null;
+  weakest_topic: string | null;
+  performance_by_difficulty: DifficultyPerformance[];
+  recent_attempts: AttemptSummary[];
+  score_trend: ScoreTrendPoint[];
+};
+
+export type TopicClassification = "Strong" | "Average" | "Weak";
+
+export type TopicPerformance = {
+  topic: string;
+  total_attempted: number;
+  total_correct: number;
+  accuracy: number;
+  classification: TopicClassification;
+  updated_at: string;
+};
+
+export function fetchProgressSummary() {
+  return request<ProgressSummary>("/progress/summary");
+}
+
+export function fetchTopicPerformance() {
+  return request<TopicPerformance[]>("/progress/topics");
+}

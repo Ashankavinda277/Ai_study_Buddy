@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "AI Study Buddy",
-  description: "Turn your notes into grounded, cited answers with AI.",
+  description: "Generate and take AI-powered quizzes from your study notes.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

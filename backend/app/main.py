@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api.routes import auth, documents, chat
+from app.api.routes import attempts, auth, chat, documents, quizzes
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -34,7 +34,7 @@ app.add_middleware(CatchAllExceptionMiddleware)
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js frontend
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],  # Next.js frontend (dev)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,6 +45,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
+app.include_router(quizzes.router)
+app.include_router(attempts.router)
 
 
 @app.get("/health")

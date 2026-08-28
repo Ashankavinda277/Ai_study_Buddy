@@ -117,7 +117,13 @@ typing_extensions==4.16.0
 uritemplate==4.2.0
 urllib3==2.7.0
 uvicorn==0.52.4
+
+# Testing
+pytest==8.4.2
+
+# Async / WebSockets / Watchers
 watchfiles==1.2.0
 websocket-client==1.9.0
 websockets==17.1
 yarl==1.24.5
+

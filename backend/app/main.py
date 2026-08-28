@@ -8,7 +8,7 @@ app = FastAPI(title="AI Study Buddy API")
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],  # Next.js frontend (dev)
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],  # Next.js frontend (dev)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

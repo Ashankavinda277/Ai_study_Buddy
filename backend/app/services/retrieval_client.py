@@ -1,16 +1,28 @@
-"""Stand-in for Member 1's document/retrieval service.
+"""Bridge to Member 1's document/retrieval pipeline.
 
-Two functions only, mirroring the API contract in
-docs/api-contracts/retrieval-api.md: list_documents() and
-search_chunks(). Both return hardcoded fake data today, so quiz
-configuration and generation can be built and tested without waiting
-on Member 1's real endpoints.
+Two functions only: list_documents() and search_chunks(). This is the
+only file that talks to Member 1's storage (Postgres `documents` table
+and the Chroma vector store) — every other file (routes, quiz
+generation) calls these two functions and never touches
+app.vector_store or app.models.document directly. That's what made it
+possible to build and test the quiz configuration form (Step 2) before
+this was wired up for real, and it's what keeps future changes to
+Member 1's pipeline contained to this one file.
 
-When Member 1's endpoints are ready, only this file changes — nothing
-else in the app should ever call Member 1's API directly.
+Note: Member 1's own `search_similar_chunks()` in app/vector_store.py
+searches the *entire* Chroma collection with no document filter, which
+isn't usable for "generate a quiz from this one document". So
+search_chunks() below calls Chroma directly (via the same `collection`
+and `embed_text()` Member 1 already built) with a `where` filter on
+document_id, instead of going through their wrapper.
 """
 
 from dataclasses import dataclass
+
+from sqlalchemy.orm import Session
+
+from app.models.document import Document
+from app.vector_store import collection, embed_text
 
 
 @dataclass
@@ -27,51 +39,37 @@ class RetrievedChunk:
     document_id: str
 
 
-_FAKE_DOCUMENTS = [
-    RetrievedDocument(id="doc-fake-1", filename="Database Systems - Chapter 4.pdf", status="ready"),
-    RetrievedDocument(id="doc-fake-2", filename="Intro to Networking.pdf", status="ready"),
-    RetrievedDocument(id="doc-fake-3", filename="Operating Systems Notes.pdf", status="processing"),
-]
+def list_documents(db: Session, user_id: int) -> list[RetrievedDocument]:
+    """Documents available to build a quiz from.
 
-_FAKE_CHUNKS = [
-    RetrievedChunk(
-        text="Normalization is the process of organizing data to reduce redundancy.",
-        page=12,
-        document_id="doc-fake-1",
-    ),
-    RetrievedChunk(
-        text="A primary key uniquely identifies each row in a table and cannot be null.",
-        page=15,
-        document_id="doc-fake-1",
-    ),
-    RetrievedChunk(
-        text="TCP provides reliable, ordered delivery of a stream of bytes between hosts.",
-        page=4,
-        document_id="doc-fake-2",
-    ),
-]
-
-
-def list_documents(user_id: int) -> list[RetrievedDocument]:
-    """Documents available to the given user for building a quiz from.
-
-    Real contract (proposed, see docs/api-contracts/retrieval-api.md):
-    GET /documents, scoped to the authenticated user, returning
-    {id, filename, status}. Stubbed here with fake data until that's
-    confirmed with Member 1.
+    Not yet scoped to `user_id` — `Document.owner_id` isn't populated by
+    the upload endpoint yet (see docs/api-contracts/retrieval-api.md).
+    Until that lands, every user sees every uploaded document.
     """
-    return _FAKE_DOCUMENTS
+    documents = db.query(Document).order_by(Document.created_at.desc()).all()
+    return [
+        RetrievedDocument(id=doc.id, filename=doc.filename, status=doc.status)
+        for doc in documents
+    ]
 
 
 def search_chunks(document_id: str, query: str, top_k: int = 8) -> list[RetrievedChunk]:
-    """Relevant chunks of a document's content for a given topic/query.
+    """Relevant chunks of one document's content for a given topic/query."""
+    query_embedding = embed_text(query)
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k,
+        where={"document_id": document_id},
+    )
 
-    Real contract (proposed): POST /retrieval/search
-        Request:  {"document_id": ..., "query": ..., "top_k": ...}
-        Response: {"chunks": [{"text": ..., "page": ..., "document_id": ...}]}
-    Stubbed here with fake data in the same shape the real response
-    will have, so this function's return type won't need to change
-    when it's wired up for real.
-    """
-    matches = [chunk for chunk in _FAKE_CHUNKS if chunk.document_id == document_id]
-    return matches[:top_k]
+    documents = results["documents"][0] if results.get("documents") else []
+    metadatas = results["metadatas"][0] if results.get("metadatas") else []
+
+    return [
+        RetrievedChunk(
+            text=text,
+            page=metadata.get("page_number"),
+            document_id=document_id,
+        )
+        for text, metadata in zip(documents, metadatas)
+    ]

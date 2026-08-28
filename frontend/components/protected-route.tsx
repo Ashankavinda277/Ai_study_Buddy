@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, loggingOut } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !loggingOut) {
       router.replace("/login");
     }
-  }, [loading, user, router]);
+  }, [loading, user, loggingOut, router]);
 
   if (loading || !user) {
     return (

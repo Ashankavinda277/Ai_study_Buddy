@@ -21,3 +21,8 @@ class UserOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserStats(BaseModel):
+    total_users: int
+    initials: list[str]

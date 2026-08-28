@@ -7,6 +7,50 @@ export type User = {
   created_at: string;
 };
 
+export type Document = {
+  id: string;
+  filename: string;
+  status: string;
+  size_bytes: number;
+  created_at: string;
+};
+
+export type DocumentProcessResult = {
+  id: string;
+  status: string;
+  total_chunks: number;
+};
+
+export type ChatSource = {
+  filename: string;
+  page_number: number | null;
+};
+
+export type AskResponse = {
+  session_id: string;
+  answer: string;
+  sources: ChatSource[];
+};
+
+export type ChatSessionSummary = {
+  id: string;
+  document_id: string;
+  title: string | null;
+  created_at: string;
+};
+
+export type ChatMessage = {
+  role: string;
+  content: string;
+  sources: ChatSource[] | null;
+  created_at: string;
+};
+
+export type ChatHistory = {
+  session_id: string;
+  messages: ChatMessage[];
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -17,11 +61,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const isFormData = options.body instanceof FormData;
+
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...options.headers,
     },
   });

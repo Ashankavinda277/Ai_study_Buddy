@@ -1,17 +1,16 @@
 services:
   postgres:
-    image: postgres:17
-    container_name: ai-study-buddy-postgres
+    image: postgres:16
+    container_name: study_buddy_db
     restart: always
     environment:
-      POSTGRES_DB: ai_study_buddy
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: study_buddy_db
+      POSTGRES_USER: studybuddy
+      POSTGRES_PASSWORD: studybuddy_pass
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-
+      - pgdata:/var/lib/postgresql/data
 
   chroma:
     image: chromadb/chroma
@@ -20,8 +19,11 @@ services:
     ports:
       - "8001:8000"
     volumes:
-      - chromadata:/chroma/chroma   
+      # chromadb persists to /data -- mounting anywhere else (e.g. /chroma/chroma)
+      # leaves the data in the container's ephemeral layer, so every recreate
+      # silently wipes all embeddings.
+      - chromadata:/data
 
 volumes:
-  postgres_data:
+  pgdata:
   chromadata:

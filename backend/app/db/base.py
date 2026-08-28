@@ -11,5 +11,4 @@ from app.models import (  # noqa: F401  (imports register tables on Base.metadat
     TopicPerformance,
     User,
 )
-
 __all__ = ["Base"]

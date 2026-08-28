@@ -109,6 +109,58 @@ export function fetchCurrentUser() {
   return request<User>("/auth/me");
 }
 
+export function uploadDocument(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return request<Document>("/documents/upload", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function listDocuments() {
+  return request<Document[]>("/documents");
+}
+
+export function processDocument(documentId: string) {
+  return request<DocumentProcessResult>(`/documents/${documentId}/process`, {
+    method: "POST",
+  });
+}
+
+export function deleteDocument(documentId: string) {
+  return request<{ message: string }>(`/documents/${documentId}`, {
+    method: "DELETE",
+  });
+}
+
+export function askQuestion(question: string, documentId: string, sessionId?: string) {
+  return request<AskResponse>("/chat/ask", {
+    method: "POST",
+    body: JSON.stringify({
+      question,
+      document_id: documentId,
+      session_id: sessionId ?? null,
+    }),
+  });
+}
+
+export function listChatSessions(documentId?: string) {
+  const query = documentId ? `?document_id=${encodeURIComponent(documentId)}` : "";
+  return request<ChatSessionSummary[]>(`/chat/sessions${query}`);
+}
+
+export function getChatHistory(sessionId: string) {
+  return request<ChatHistory>(`/chat/sessions/${sessionId}`);
+}
+
+export function deleteChatSession(sessionId: string) {
+  return request<{ message: string }>(`/chat/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+}
+
 export type QuizQuestionPublic = {
   id: number;
   question: string;

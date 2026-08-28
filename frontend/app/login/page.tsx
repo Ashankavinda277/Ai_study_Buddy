@@ -56,19 +56,8 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
-        >
-          {submitting ? "Logging in..." : "Log in"}
-        </button>
-
-        <p className="text-sm text-zinc-500">
-          Need an account?{" "}
-          <Link href="/register" className="font-medium underline">
-            Register
-          </Link>
+        <p className="relative text-xs text-indigo-300">
+          © {new Date().getFullYear()} AI Study Buddy
         </p>
       </div>
 

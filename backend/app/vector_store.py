@@ -30,7 +30,7 @@ def _get_client():
     return _client
 
 
-def _get_collection():
+def get_collection():
     """Resolve the collection fresh on each call.
 
     Holding a long-lived collection object breaks as soon as the Chroma
@@ -52,7 +52,7 @@ def embed_text(text: str):
 
 def add_chunk_to_vector_store(chunk_id: str, chunk_text: str, metadata: dict):
     embedding = embed_text(chunk_text)
-    _get_collection().add(
+    get_collection().add(
         ids=[chunk_id],
         embeddings=[embedding],
         documents=[chunk_text],
@@ -61,12 +61,12 @@ def add_chunk_to_vector_store(chunk_id: str, chunk_text: str, metadata: dict):
 
 
 def delete_chunks_for_document(document_id: str):
-    _get_collection().delete(where={"document_id": document_id})
+    get_collection().delete(where={"document_id": document_id})
 
 
 def search_similar_chunks(query: str, n_results: int = 5):
     query_embedding = embed_text(query)
-    results = _get_collection().query(
+    results = get_collection().query(
         query_embeddings=[query_embedding],
         n_results=n_results,
     )

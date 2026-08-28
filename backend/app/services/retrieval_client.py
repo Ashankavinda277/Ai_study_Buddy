@@ -12,9 +12,9 @@ Member 1's pipeline contained to this one file.
 Note: Member 1's own `search_similar_chunks()` in app/vector_store.py
 searches the *entire* Chroma collection with no document filter, which
 isn't usable for "generate a quiz from this one document". So
-search_chunks() below calls Chroma directly (via the same `collection`
-and `embed_text()` Member 1 already built) with a `where` filter on
-document_id, instead of going through their wrapper.
+search_chunks() below calls Chroma directly (via the same
+`get_collection()` and `embed_text()` Member 1 already built) with a
+`where` filter on document_id, instead of going through their wrapper.
 """
 
 from dataclasses import dataclass
@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.models.document import Document
-from app.vector_store import collection, embed_text
+from app.vector_store import embed_text, get_collection
 
 
 @dataclass
@@ -56,7 +56,7 @@ def list_documents(db: Session, user_id: int) -> list[RetrievedDocument]:
 def search_chunks(document_id: str, query: str, top_k: int = 8) -> list[RetrievedChunk]:
     """Relevant chunks of one document's content for a given topic/query."""
     query_embedding = embed_text(query)
-    results = collection.query(
+    results = get_collection().query(
         query_embeddings=[query_embedding],
         n_results=top_k,
         where={"document_id": document_id},

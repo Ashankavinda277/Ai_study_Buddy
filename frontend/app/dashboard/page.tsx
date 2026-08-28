@@ -1,22 +1,18 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-import { ProtectedRoute } from "@/components/protected-route";
-import { useAuth } from "@/lib/auth-context";
-
-function DashboardContent() {
-  const { user, logout } = useAuth();
+export default function DashboardPage() {
   const router = useRouter();
 
-  async function handleLogout() {
-    await logout();
-    router.push("/login");
-  }
+  useEffect(() => {
+    router.replace("/documents");
+  }, [router]);
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-16">
+      <div className="flex flex-1 items-center justify-center"></div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Welcome, {user?.name}</h1>
         <button
@@ -83,13 +79,5 @@ function DashboardContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function DashboardPage() {
-  return (
-    <ProtectedRoute>
-      <DashboardContent />
-    </ProtectedRoute>
   );
 }

@@ -7,6 +7,7 @@ from app.schemas.chat import (
     AskResponse,
     ChatHistoryResponse,
     ChatSessionDeleteResponse,
+    ChatSessionSummary,
 )
 from app.services import chat_services
 
@@ -24,6 +25,11 @@ def ask_question(request: AskRequest, db: Session = Depends(get_db)):
     return AskResponse(session_id=session.id, answer=answer, sources=sources)
 
 
+@router.get("/sessions", response_model=list[ChatSessionSummary])
+def list_chat_sessions(document_id: str | None = None, db: Session = Depends(get_db)):
+    return chat_services.list_chat_sessions(db, document_id)
+
+
 @router.get("/sessions/{session_id}", response_model=ChatHistoryResponse)
 def get_chat_history(session_id: str, db: Session = Depends(get_db)):
     messages = chat_services.get_session_history(db, session_id)
@@ -35,3 +41,4 @@ def delete_chat_session(session_id: str, db: Session = Depends(get_db)):
     session = chat_services.get_session_or_404(db, session_id)
     chat_services.delete_chat_session(db, session)
     return ChatSessionDeleteResponse(message=f"Chat session {session_id} deleted successfully")
+

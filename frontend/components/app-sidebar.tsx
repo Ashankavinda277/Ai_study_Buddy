@@ -50,7 +50,7 @@ export function AppSidebar({ active }: { active: SidebarActiveKey }) {
 
   async function handleLogout() {
     await logout();
-    router.push("/login");
+    router.push("/");
   }
 
   return (

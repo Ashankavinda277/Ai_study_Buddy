@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, GraduationCap, Lock, LogIn, Mail } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, GraduationCap, Lock, Mail } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
@@ -64,6 +64,14 @@ export default function LoginPage() {
       {/* Form panel */}
       <div className="flex flex-1 items-center justify-center bg-white px-6 py-12">
         <div className="w-full max-w-sm">
+          <Link
+            href="/"
+            className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-400 hover:text-indigo-600"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Home
+          </Link>
+
           <div className="mb-8 flex flex-col items-start">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-900 shadow-md lg:hidden">
               <GraduationCap className="h-6 w-6 text-white" />
@@ -112,17 +120,9 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-xs font-semibold text-indigo-950">
-                  Password
-                </label>
-                <button
-                  type="button"
-                  className="text-xs font-medium text-indigo-500 hover:text-indigo-700"
-                >
-                  Forgot password?
-                </button>
-              </div>
+              <label htmlFor="password" className="text-xs font-semibold text-indigo-950">
+                Password
+              </label>
               <div className="relative">
                 <Lock className="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-indigo-300" />
                 <input
@@ -153,20 +153,6 @@ export default function LoginPage() {
               {submitting ? "Signing in..." : "Sign In"}
             </button>
           </form>
-
-          <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-indigo-100" />
-            <span className="text-xs text-indigo-300">or continue with</span>
-            <div className="h-px flex-1 bg-indigo-100" />
-          </div>
-
-          <button
-            type="button"
-            className="flex w-full items-center justify-center gap-2 rounded-full border border-indigo-100 bg-white py-2.5 text-sm font-medium text-indigo-950 transition-colors hover:bg-indigo-50"
-          >
-            <LogIn className="h-4 w-4" />
-            Google
-          </button>
         </div>
       </div>
     </div>

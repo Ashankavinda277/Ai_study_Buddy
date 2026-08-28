@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useEffect, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, FileText, MessageSquare, RotateCcw, Search, Trash2, UploadCloud } from "lucide-react";
+import { FileText, MessageSquare, RotateCcw, Search, Trash2, UploadCloud } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -127,12 +127,6 @@ function DocumentManager() {
               className="w-full rounded-full border-none bg-indigo-50/70 py-2 pr-4 pl-9 text-sm text-indigo-950 placeholder:text-indigo-300 outline-none focus:ring-2 focus:ring-indigo-300"
             />
           </div>
-          <button
-            title="Not available yet"
-            className="ml-auto hidden cursor-not-allowed items-center justify-center rounded-full p-2 text-indigo-400 sm:flex"
-          >
-            <Bell className="h-4 w-4" />
-          </button>
         </header>
 
         <main className="flex-1 overflow-y-auto px-6 py-8">

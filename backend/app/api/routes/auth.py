@@ -6,11 +6,12 @@ from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.database import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, UserOut
+from app.schemas.user import UserCreate, UserLogin, UserOut, UserStats
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 COOKIE_NAME = "access_token"
+RECENT_INITIALS_LIMIT = 5
 
 
 def _set_auth_cookie(response: Response, user: User) -> None:
@@ -23,6 +24,16 @@ def _set_auth_cookie(response: Response, user: User) -> None:
         samesite="lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
+
+
+@router.get("/stats", response_model=UserStats)
+def get_user_stats(db: Session = Depends(get_db)):
+    total_users = db.query(User).count()
+    recent_users = (
+        db.query(User).order_by(User.created_at.desc()).limit(RECENT_INITIALS_LIMIT).all()
+    )
+    initials = [user.name[0].upper() for user in recent_users if user.name]
+    return UserStats(total_users=total_users, initials=initials)
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)

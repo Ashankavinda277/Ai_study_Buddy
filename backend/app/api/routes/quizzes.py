@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -17,8 +19,11 @@ from app.schemas.quiz import (
     QuizSubmitResponse,
 )
 from app.services import retrieval_client
-from app.services.grading import GradableQuestion, SubmittedAnswer, grade_quiz
+from app.services.feedback_generator import IncorrectItem, generate_feedback
+from app.services.grading import GradableQuestion, GradingResult, SubmittedAnswer, grade_quiz
 from app.services.quiz_generator import QuizGenerationError, generate_quiz_content
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/quizzes", tags=["quizzes"])
 
@@ -126,6 +131,54 @@ def get_quiz(
     )
 
 
+def _generate_attempt_feedback(
+    quiz: Quiz, questions: list[QuizQuestion], result: GradingResult
+) -> str | None:
+    """Builds the incorrect-questions-only feedback prompt and calls the AI.
+
+    Never raises: a chunk-retrieval or AI failure here should not fail the
+    whole submission, since the score is already graded and saved either way.
+    """
+    questions_by_id = {q.id: q for q in questions}
+
+    incorrect_items: list[IncorrectItem] = []
+    incorrect_topics: list[str] = []
+    for question_result in result.question_results:
+        if question_result.is_correct:
+            continue
+        question = questions_by_id[question_result.question_id]
+        options = [question.option_a, question.option_b, question.option_c, question.option_d]
+        selected = question_result.selected_answer
+        incorrect_items.append(
+            IncorrectItem(
+                question=question.question,
+                selected_answer_text=options[selected] if selected is not None else None,
+                correct_answer_text=options[question_result.correct_answer],
+                explanation=question.explanation,
+                topic=question.topic,
+            )
+        )
+        if question.topic:
+            incorrect_topics.append(question.topic)
+
+    chunks: list[str] = []
+    try:
+        if incorrect_items:
+            query = ", ".join(dict.fromkeys(incorrect_topics)) or quiz.topic or "overview"
+            chunks = [c.text for c in retrieval_client.search_chunks(quiz.document_id, query, top_k=5)]
+
+        return generate_feedback(
+            quiz_topic=quiz.topic,
+            score_percentage=result.score_percentage,
+            performance_level=result.performance_level,
+            incorrect_items=incorrect_items,
+            chunks=chunks,
+        )
+    except Exception as e:  # noqa: BLE001 - feedback is enrichment, never blocks grading
+        logger.warning("Skipping AI feedback for quiz %s: %s", quiz.id, e)
+        return None
+
+
 @router.post("/{quiz_id}/submit", response_model=QuizSubmitResponse)
 def submit_quiz(
     quiz_id: int,
@@ -167,6 +220,8 @@ def submit_quiz(
                 is_correct=question_result.is_correct,
             )
         )
+
+    attempt.ai_feedback = _generate_attempt_feedback(quiz, questions, result)
 
     db.commit()
 

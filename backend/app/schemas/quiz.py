@@ -99,5 +99,19 @@ class AttemptDetail(BaseModel):
     score_percentage: float
     performance_level: str
     time_taken: int | None = None
+    ai_feedback: str | None = None
     completed_at: datetime
     questions: list[QuestionReview]
+
+
+class AttemptSummary(BaseModel):
+    id: int
+    quiz_id: int
+    quiz_title: str
+    document_filename: str
+    topic: str | None = None
+    difficulty: str
+    score_percentage: float
+    performance_level: str
+    time_taken: int | None = None
+    completed_at: datetime

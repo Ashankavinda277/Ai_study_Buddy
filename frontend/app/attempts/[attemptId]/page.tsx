@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { CheckCircle2, XCircle, Clock, Award, ArrowLeft, RotateCcw, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Award, ArrowLeft, RotateCcw, AlertCircle, Loader2, Sparkles } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { ApiError, fetchAttempt, type AttemptDetail } from "@/lib/api";
@@ -137,6 +137,21 @@ function ResultsContent({ attemptId }: { attemptId: number }) {
             </div>
           </div>
         </div>
+
+        {/* AI Feedback */}
+        {attempt.ai_feedback && (
+          <div className="mb-8 rounded-[1.75rem] border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-6 sm:p-7 shadow-sm">
+            <div className="flex items-center gap-2 text-[#352599] font-semibold text-sm">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#352599] text-white shadow-sm">
+                <Sparkles className="w-4 h-4" />
+              </span>
+              <span>Personalized Feedback</span>
+            </div>
+            <p className="mt-3 text-sm sm:text-[15px] leading-relaxed text-indigo-950/90">
+              {attempt.ai_feedback}
+            </p>
+          </div>
+        )}
 
         {/* Detailed Question Review */}
         <div className="mb-6 flex items-center justify-between">

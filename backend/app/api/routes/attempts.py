@@ -1,17 +1,69 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.database import get_db
+from app.models.document import Document
 from app.models.quiz import Quiz
 from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_question import QuizQuestion
 from app.models.student_answer import StudentAnswer
 from app.models.user import User
-from app.schemas.quiz import AttemptDetail, QuestionReview
+from app.schemas.quiz import AttemptDetail, AttemptSummary, QuestionReview
 from app.services.grading import performance_level
 
 router = APIRouter(prefix="/attempts", tags=["attempts"])
+
+
+@router.get("", response_model=list[AttemptSummary])
+def list_attempts(
+    document_id: str | None = None,
+    topic: str | None = None,
+    difficulty: Literal["easy", "medium", "hard"] | None = None,
+    sort: Literal["newest", "oldest", "score"] = "newest",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = (
+        db.query(QuizAttempt, Quiz, Document)
+        .join(Quiz, QuizAttempt.quiz_id == Quiz.id)
+        .join(Document, Quiz.document_id == Document.id)
+        .filter(QuizAttempt.user_id == current_user.id)
+    )
+
+    if document_id:
+        query = query.filter(Quiz.document_id == document_id)
+    if topic:
+        query = query.filter(Quiz.topic.ilike(f"%{topic}%"))
+    if difficulty:
+        query = query.filter(Quiz.difficulty == difficulty)
+
+    # completed_at alone isn't a reliable tiebreaker for attempts submitted
+    # within the same second, so every ordering falls back to id.
+    if sort == "oldest":
+        query = query.order_by(QuizAttempt.completed_at.asc(), QuizAttempt.id.asc())
+    elif sort == "score":
+        query = query.order_by(QuizAttempt.score_percentage.desc(), QuizAttempt.id.desc())
+    else:
+        query = query.order_by(QuizAttempt.completed_at.desc(), QuizAttempt.id.desc())
+
+    return [
+        AttemptSummary(
+            id=attempt.id,
+            quiz_id=quiz.id,
+            quiz_title=quiz.title,
+            document_filename=document.filename,
+            topic=quiz.topic,
+            difficulty=quiz.difficulty,
+            score_percentage=attempt.score_percentage,
+            performance_level=performance_level(attempt.score_percentage),
+            time_taken=attempt.time_taken,
+            completed_at=attempt.completed_at,
+        )
+        for attempt, quiz, document in query.all()
+    ]
 
 
 @router.get("/{attempt_id}", response_model=AttemptDetail)
@@ -66,6 +118,7 @@ def get_attempt(
         score_percentage=attempt.score_percentage,
         performance_level=performance_level(attempt.score_percentage),
         time_taken=attempt.time_taken,
+        ai_feedback=attempt.ai_feedback,
         completed_at=attempt.completed_at,
         questions=question_reviews,
     )

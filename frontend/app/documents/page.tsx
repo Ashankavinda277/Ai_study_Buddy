@@ -7,6 +7,7 @@ import { Bell, FileText, MessageSquare, RotateCcw, Search, Trash2, UploadCloud }
 import { ProtectedRoute } from "@/components/protected-route";
 import { AppSidebar } from "@/components/app-sidebar";
 import { StatusBadge } from "@/components/status-badge";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { formatSize, formatDate } from "@/lib/format";
 import {
   uploadDocument,
@@ -26,6 +27,8 @@ function DocumentManager() {
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchDocuments = async () => {
@@ -81,13 +84,18 @@ function DocumentManager() {
     await uploadFile(file);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deleteDocument(id);
+      await deleteDocument(deleteTarget.id);
       await fetchDocuments();
+      setDeleteTarget(null);
     } catch (err) {
       console.error(err);
       alert("Delete failed");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -221,7 +229,7 @@ function DocumentManager() {
                         </button>
                       )}
                       <button
-                        onClick={() => handleDelete(doc.id)}
+                        onClick={() => setDeleteTarget(doc)}
                         className="flex items-center justify-center rounded-full border border-indigo-100 p-2 text-indigo-400 transition-colors hover:bg-red-50 hover:text-red-600"
                         aria-label="Delete document"
                       >
@@ -235,6 +243,19 @@ function DocumentManager() {
           </div>
         </main>
       </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete this document?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.filename}" and its entire chat history will be permanently removed. This can't be undone.`
+            : ""
+        }
+        loading={deleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

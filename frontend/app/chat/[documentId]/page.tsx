@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
   Bot,
   Check,
   Copy,
@@ -18,8 +16,7 @@ import {
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { AppSidebar } from "@/components/app-sidebar";
-import { StatusBadge } from "@/components/status-badge";
-import { formatSize } from "@/lib/format";
+import { DocumentContextPanel } from "@/components/document-context-panel";
 import { useAuth } from "@/lib/auth-context";
 import { askQuestion, getChatHistory, listDocuments, type Document } from "@/lib/api";
 
@@ -28,12 +25,13 @@ type Message = { role: "user" | "assistant"; content: string; sources?: Source[]
 
 function ChatWithNotes() {
   const { user } = useAuth();
+  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const documentId = params.documentId as string;
   const initialSessionId = searchParams.get("session") ?? undefined;
 
-  const [doc, setDoc] = useState<Document | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [docLoading, setDocLoading] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [historyLoading, setHistoryLoading] = useState(Boolean(initialSessionId));
@@ -43,13 +41,15 @@ function ChatWithNotes() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Load the document's own metadata for the context panel
+  // Load all documents for the context panel (active doc + switcher list)
   useEffect(() => {
     listDocuments()
-      .then((docs) => setDoc(docs.find((d) => d.id === documentId) ?? null))
+      .then(setDocuments)
       .catch((err) => console.error(err))
       .finally(() => setDocLoading(false));
-  }, [documentId]);
+  }, []);
+
+  const doc = documents.find((d) => d.id === documentId) ?? null;
 
   // Load existing history if resuming a session
   useEffect(() => {
@@ -118,51 +118,12 @@ function ChatWithNotes() {
     <div className="flex flex-1 bg-indigo-50/40">
       <AppSidebar active="chat" />
 
-      {/* Context panel */}
-      <div className="hidden w-72 shrink-0 flex-col border-r border-indigo-100 bg-white px-5 py-6 md:flex">
-        <Link
-          href="/documents"
-          className="flex items-center gap-1.5 text-sm font-medium text-indigo-500 hover:text-indigo-700"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Library
-        </Link>
-
-        <h2 className="mt-5 text-lg font-semibold text-indigo-950">Context Document</h2>
-        <p className="mt-1 text-sm text-indigo-400">
-          The AI is currently answering based on this specific file.
-        </p>
-
-        <div className="mt-5 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
-          {docLoading ? (
-            <p className="text-sm text-indigo-400">Loading...</p>
-          ) : doc ? (
-            <>
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white">
-                  <FileText className="h-4 w-4 text-indigo-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-indigo-950">{doc.filename}</p>
-                  <p className="text-xs text-indigo-400">PDF · {formatSize(doc.size_bytes)}</p>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center gap-1.5">
-                {doc.status === "ready" ? (
-                  <>
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-xs font-medium text-emerald-700">Active Context</span>
-                  </>
-                ) : (
-                  <StatusBadge status={doc.status} />
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-indigo-400">Document not found.</p>
-          )}
-        </div>
-      </div>
+      <DocumentContextPanel
+        documents={documents}
+        loading={docLoading}
+        activeDocumentId={documentId}
+        onSelect={(id) => router.push(`/chat/${id}`)}
+      />
 
       {/* Chat panel */}
       <div className="flex flex-1 flex-col">

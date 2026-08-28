@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   GraduationCap,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
+import { listChatSessions, type ChatSessionSummary } from "@/lib/api";
 
 export type SidebarActiveKey = "dashboard" | "notes" | "chat" | "quiz";
 
@@ -25,18 +27,26 @@ const NAV_ITEMS: {
 }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/documents" },
   { key: "notes", label: "My Notes", icon: NotebookText, href: "/documents" },
-  { key: "chat", label: "AI Chat", icon: MessageSquare, href: "/documents" },
+  { key: "chat", label: "AI Chat", icon: MessageSquare, href: "/chat" },
   { key: "quiz", label: "Quiz Module", icon: ListChecks, href: "/documents" },
 ];
 
-// Only these have a real destination today -- "chat" only counts as real when
-// it's the page you're already on (there's no chat list without picking a
-// document first). Everything else is visually present but not wired up yet.
-const REAL_KEYS: SidebarActiveKey[] = ["dashboard"];
+// Only these have a real destination today. Everything else is visually
+// present but not wired up yet.
+const REAL_KEYS: SidebarActiveKey[] = ["dashboard", "chat"];
+
+const RECENTS_LIMIT = 6;
 
 export function AppSidebar({ active }: { active: SidebarActiveKey }) {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const [recents, setRecents] = useState<ChatSessionSummary[]>([]);
+
+  useEffect(() => {
+    listChatSessions()
+      .then((sessions) => setRecents(sessions.slice(0, RECENTS_LIMIT)))
+      .catch((err) => console.error(err));
+  }, []);
 
   async function handleLogout() {
     await logout();
@@ -63,54 +73,78 @@ export function AppSidebar({ active }: { active: SidebarActiveKey }) {
         New Study Session
       </button>
 
-      <nav className="mt-8 flex flex-col gap-1">
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isActive = item.key === active;
-          const isReal = REAL_KEYS.includes(item.key);
+      <div className="mt-8 flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <nav className="flex flex-col gap-1">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.key === active;
+            const isReal = REAL_KEYS.includes(item.key);
 
-          if (isActive) {
+            if (isActive) {
+              return (
+                <span
+                  key={item.key}
+                  className="flex items-center gap-2.5 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-900"
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </span>
+              );
+            }
+
+            if (isReal) {
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => router.push(item.href)}
+                  className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            }
+
             return (
               <span
                 key={item.key}
-                className="flex items-center gap-2.5 rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-900"
+                title="Not available yet"
+                className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-indigo-300"
               >
                 <Icon className="h-4 w-4" />
                 {item.label}
+                <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-indigo-200">
+                  Soon
+                </span>
               </span>
             );
-          }
+          })}
+        </nav>
 
-          if (isReal) {
-            return (
-              <button
-                key={item.key}
-                onClick={() => router.push(item.href)}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </button>
-            );
-          }
+        <div className="mt-6">
+          <p className="px-3 text-[11px] font-semibold tracking-wide text-indigo-300 uppercase">
+            Recents
+          </p>
+          <div className="mt-2 flex flex-col gap-0.5">
+            {recents.length === 0 ? (
+              <p className="px-3 py-1.5 text-xs text-indigo-300">No conversations yet</p>
+            ) : (
+              recents.map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => router.push(`/chat/${session.document_id}?session=${session.id}`)}
+                  title={session.title ?? "Untitled Conversation"}
+                  className="truncate rounded-lg px-3 py-1.5 text-left text-xs text-indigo-500 transition-colors hover:bg-indigo-50 hover:text-indigo-700"
+                >
+                  {session.title || "Untitled Conversation"}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
 
-          return (
-            <span
-              key={item.key}
-              title="Not available yet"
-              className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-indigo-300"
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-indigo-200">
-                Soon
-              </span>
-            </span>
-          );
-        })}
-      </nav>
-
-      <div className="mt-auto flex flex-col gap-1 border-t border-indigo-100 pt-4">
+      <div className="flex flex-col gap-1 border-t border-indigo-100 pt-4">
         <span
           title="Not available yet"
           className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-indigo-300"

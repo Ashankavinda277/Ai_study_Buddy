@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.routes import attempts, auth, chat, documents, progress, quizzes
+from app.core.config import settings
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -31,10 +32,12 @@ class CatchAllExceptionMiddleware(BaseHTTPMiddleware):
 # a generic network failure ("Failed to fetch") instead of the real error.
 app.add_middleware(CatchAllExceptionMiddleware)
 
-# CORS configuration
+# CORS configuration. Origins come from CORS_ORIGINS (comma-separated) so the
+# deployed frontend's domain can be added without a code change. Origins must
+# match exactly: scheme, host, port, and no trailing slash.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],  # Next.js frontend (dev)
+    allow_origins=[origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

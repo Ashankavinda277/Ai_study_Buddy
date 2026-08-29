@@ -1,0 +1,26 @@
+# Installed on the builder stage via `npm ci` -- never copy the host's copy,
+# which may hold platform-specific binaries built for Windows.
+node_modules/
+
+# Build output -- regenerated inside the image
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

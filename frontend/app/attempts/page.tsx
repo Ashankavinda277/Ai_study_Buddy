@@ -57,20 +57,34 @@ function HistoryContent() {
   const [sort, setSort] = useState<AttemptSort>("newest");
 
   useEffect(() => {
-    setAttempts(null);
-    setError(null);
+    // The loading reset happens inside the debounced callback rather than in
+    // the effect body: setting state synchronously in an effect triggers a
+    // cascading render. It also means the previous results stay on screen
+    // while you type instead of flashing empty on every keystroke.
+    let cancelled = false;
     const timeout = setTimeout(() => {
+      setAttempts(null);
+      setError(null);
       fetchAttempts({
         topic: topic.trim() || undefined,
         difficulty: difficulty || undefined,
         sort,
       })
-        .then(setAttempts)
-        .catch((err) =>
-          setError(err instanceof ApiError ? err.message : "Failed to load quiz history.")
-        );
+        .then((data) => {
+          // Guard against a slow response for an older filter landing after a
+          // newer one and overwriting it.
+          if (!cancelled) setAttempts(data);
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setError(err instanceof ApiError ? err.message : "Failed to load quiz history.");
+          }
+        });
     }, 250); // debounce the topic text input
-    return () => clearTimeout(timeout);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [topic, difficulty, sort]);
 
   return (

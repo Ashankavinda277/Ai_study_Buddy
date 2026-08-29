@@ -21,7 +21,7 @@ def _set_auth_cookie(response: Response, user: User) -> None:
         value=token,
         httponly=True,
         secure=settings.COOKIE_SECURE,
-        samesite="lax",
+        samesite=settings.COOKIE_SAMESITE,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
@@ -76,5 +76,13 @@ def read_current_user(current_user: User = Depends(get_current_user)):
 
 @router.post("/logout")
 def logout(response: Response):
-    response.delete_cookie(COOKIE_NAME)
+    # The attributes must match those used when the cookie was set, or the
+    # browser treats it as a different cookie and silently leaves the session
+    # in place.
+    response.delete_cookie(
+        COOKIE_NAME,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+    )
     return {"detail": "Logged out"}

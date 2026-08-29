@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Guards that exist because these exact failures reached main already.
+  # ---------------------------------------------------------------------------
+  migrations:
+    name: Alembic single head
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Alembic only
+        run: pip install "alembic==1.19.1" "SQLAlchemy==2.0.52"
+
+      - name: Fail if the revision tree has more than one head
+        working-directory: backend
+        run: |
+          # Two branches each generating their own merge revision leaves two
+          # heads. `alembic current` still reports "(head)" and looks healthy,
+          # while everything on the unapplied branch -- the whole quiz schema,
+          # in our case -- silently never gets created.
+          # `alembic heads` reads the version files only, so no database needed.
+          heads=$(python -m alembic heads | grep -c '(head)' || true)
+          echo "Alembic heads found: $heads"
+          python -m alembic heads
+          if [ "$heads" -ne 1 ]; then
+            echo "::error::Expected exactly 1 Alembic head, found $heads. Run: alembic merge -m 'merge heads' <rev1> <rev2>"
+            exit 1
+          fi
+
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        working-directory: backend
+        # conftest.py builds an in-memory SQLite database per test, so no
+        # Postgres service and no API keys are required here.
+        run: python -m pytest -q
+
+  frontend:
+    name: Frontend typecheck and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        # `npm ci` installs strictly from the lockfile and fails if package.json
+        # and package-lock.json disagree -- which is how a merge that updates one
+        # but not the other gets caught here rather than at runtime.
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: frontend
+        # This is the guard that catches a merge silently dropping exported
+        # functions from lib/api.ts while leaving their callers in place.
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: frontend
+        # Reported but not enforced yet: app/attempts/page.tsx and
+        # app/help/page.tsx still trip react-hooks/set-state-in-effect and
+        # react/no-unescaped-entities. Delete this line to make lint blocking
+        # once those two are fixed.
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  images:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    # Only worth the minutes once the code itself is known good.
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://localhost:8000

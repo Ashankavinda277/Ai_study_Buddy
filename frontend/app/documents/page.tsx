@@ -42,7 +42,22 @@ function DocumentManager() {
   };
 
   useEffect(() => {
-    fetchDocuments();
+    // Resolved in a promise callback rather than by awaiting fetchDocuments()
+    // directly, so state is never set synchronously inside the effect body.
+    // The cancelled flag stops a slow response from setting state after the
+    // user has already navigated away.
+    let cancelled = false;
+    listDocuments()
+      .then((data) => {
+        if (!cancelled) setDocuments(data);
+      })
+      .catch((err) => {
+        console.error(err);
+        alert("Failed to load documents");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredDocuments = useMemo(() => {

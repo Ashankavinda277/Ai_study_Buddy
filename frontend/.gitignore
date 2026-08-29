@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the template, which documents the required variables and holds no
+# secrets. This negation has to live here: rules in a nested .gitignore take
+# precedence over the repository-root one.
+!.env.example
 
 # vercel
 .vercel

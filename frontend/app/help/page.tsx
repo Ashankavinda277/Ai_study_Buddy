@@ -137,7 +137,7 @@ function HelpContent() {
               </h2>
               <p className="relative mt-3 max-w-xl text-sm text-indigo-200 sm:text-base">
                 This guide walks through every module — upload your notes, chat with them, generate
-                a quiz, and track how you're improving.
+                a quiz, and track how you&apos;re improving.
               </p>
             </div>
 

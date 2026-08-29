@@ -1,26 +1,33 @@
+import math
 import os
 
 import chromadb
-from sentence_transformers import SentenceTransformer
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+load_dotenv()
 
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8001"))
 COLLECTION_NAME = "document_chunks"
 
-# Both the embedding model and the Chroma client are created lazily rather than
-# at import time. Connecting at import meant a Chroma outage stopped the whole
-# API from starting -- including /health and the auth routes, which don't use
-# vectors at all.
-_embedding_model = None
+# Embeddings come from the Gemini API rather than a local sentence-transformers
+# model. The local model pulled in torch + transformers + scipy + scikit-learn:
+# ~1GB of image and ~470MB of resident memory, which does not fit a small
+# container. This is a network call instead, so it is subject to API rate
+# limits, but it keeps the service small enough to host cheaply.
+EMBED_MODEL = "models/gemini-embedding-001"
+
+# The model's native width is 3072. 768 is plenty for this corpus and keeps the
+# Chroma collection roughly a quarter of the size.
+EMBED_DIM = 768
+
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# The Chroma client is created lazily rather than at import time. Connecting at
+# import meant a Chroma outage stopped the whole API from starting -- including
+# /health and the auth routes, which don't use vectors at all.
 _client = None
-
-
-def _get_embedding_model():
-    global _embedding_model
-    if _embedding_model is None:
-        # Local embedding model - runs on your CPU, completely free
-        _embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-    return _embedding_model
 
 
 def _get_client():
@@ -46,8 +53,26 @@ def get_collection():
         return _get_client().get_or_create_collection(name=COLLECTION_NAME)
 
 
-def embed_text(text: str):
-    return _get_embedding_model().encode(text).tolist()
+def _normalize(vector: list[float]) -> list[float]:
+    """Scale a vector to unit length.
+
+    gemini-embedding-001 returns unit vectors at its native 3072 dimensions,
+    but a truncated output is NOT normalized -- a 768-dim response measures
+    ~0.57. Chroma ranks by L2 distance, so feeding it vectors of varying
+    magnitude skews every similarity result. This fails silently: retrieval
+    still returns chunks, just the wrong ones.
+    """
+    norm = math.sqrt(sum(component * component for component in vector))
+    return [component / norm for component in vector] if norm else vector
+
+
+def embed_text(text: str) -> list[float]:
+    result = genai.embed_content(
+        model=EMBED_MODEL,
+        content=text,
+        output_dimensionality=EMBED_DIM,
+    )
+    return _normalize(result["embedding"])
 
 
 def add_chunk_to_vector_store(chunk_id: str, chunk_text: str, metadata: dict):

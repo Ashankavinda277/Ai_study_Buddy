@@ -5,10 +5,10 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
 
 import {
   fetchCurrentUser,
@@ -21,7 +21,12 @@ import {
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
-  loggingOut: boolean;
+  // Consumed by ProtectedRoute. Logging out sets `user` to null, which would
+  // otherwise trip the guard's "not signed in -> /login" redirect and beat the
+  // caller's own navigation. Whoever calls logout() decides where to go next;
+  // this returns true exactly once after a logout, telling the guard to stand
+  // down for that render.
+  consumeGuardSkip: () => boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -29,21 +34,10 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// Pages ProtectedRoute never guards -- once we land on one of these after
-// logout, the redirect race is over and it's safe to re-arm the guard.
-const PUBLIC_PATHS = ["/", "/login", "/register"];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loggingOut, setLoggingOut] = useState(false);
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (loggingOut && PUBLIC_PATHS.includes(pathname)) {
-      setLoggingOut(false);
-    }
-  }, [loggingOut, pathname]);
+  const skipNextGuardRedirect = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,12 +72,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await logoutUser();
-    setLoggingOut(true);
+    skipNextGuardRedirect.current = true;
     setUser(null);
   }, []);
 
+  const consumeGuardSkip = useCallback(() => {
+    if (!skipNextGuardRedirect.current) return false;
+    skipNextGuardRedirect.current = false;
+    return true;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, loggingOut, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, consumeGuardSkip, login, register, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -11,9 +11,29 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The backend runs `alembic upgrade head` the moment it starts, so it must
+      # not start until Postgres can actually accept connections.
+      test: ["CMD-SHELL", "pg_isready -U studybuddy -d study_buddy_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   chroma:
-    image: chromadb/chroma
+    # Pinned by digest to the exact image this project has been running and
+    # storing embeddings with (chroma server 1.4.4). Two reasons for a digest
+    # rather than a tag:
+    #
+    #   * :latest is a moving target -- a breaking release would land on the
+    #     next `docker compose pull` with no change on your side.
+    #   * Chroma publishes no 1.4.4 tag, and pinning to a *different* version
+    #     would upgrade the server underneath an existing embeddings volume as
+    #     a side effect of adding a pin.
+    #
+    # To upgrade deliberately later: back up the chromadata volume first, then
+    # change this digest and re-process your documents if the collection fails
+    # to load.
+    image: chromadb/chroma@sha256:1e0b73a187a28757c572acba508c46f48c9e8b0acaf5c20e6d95cdedce1acdf6
     container_name: study_buddy_chroma
     restart: always
     ports:
@@ -24,6 +44,56 @@ services:
       # silently wipes all embeddings.
       - chromadata:/data
 
+  backend:
+    build:
+      context: ./backend
+    container_name: study_buddy_api
+    restart: always
+    # Secrets (GEMINI_API_KEY, SECRET_KEY, ALGORITHM, token lifetime) come from
+    # the file you already keep locally and never commit.
+    env_file:
+      - ./backend/.env
+    environment:
+      # These override the same keys in backend/.env, which point at localhost
+      # for running outside Docker. Inside the compose network the services are
+      # reachable by service name instead.
+      DATABASE_URL: postgresql://studybuddy:studybuddy_pass@postgres:5432/study_buddy_db
+      CHROMA_HOST: chroma
+      # Chroma listens on 8000 *inside* the network. The 8001 in the ports
+      # mapping above is the host-side port only.
+      CHROMA_PORT: 8000
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      # Uploaded PDFs must outlive the container. Without this, every rebuild
+      # leaves documents marked "ready" in Postgres with no file behind them.
+      - uploads:/app/uploaded_files
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # No condition here: vector_store.py resolves its Chroma client lazily and
+      # retries once, so the API starts fine while Chroma is still booting.
+      chroma:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # This is baked into the client bundle at build time and is fetched by
+        # the user's *browser*, not by the frontend container -- so it has to be
+        # a URL the browser can reach. "http://backend:8000" would only resolve
+        # inside the compose network and will fail in the browser.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: study_buddy_web
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
 volumes:
   pgdata:
   chromadata:
+  uploads:

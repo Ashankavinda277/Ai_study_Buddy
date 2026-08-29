@@ -1,0 +1,31 @@
+# Virtualenvs -- never copy a Windows venv into a Linux image
+.venv/
+.venv-clean/
+venv/
+env/
+
+# Python caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets. The image reads config from the environment, never from a baked file.
+.env
+.env.*
+!.env.example
+
+# Runtime data -- uploads belong on a mounted volume, not in the image layer
+uploaded_files/
+
+# Local database dumps
+backups/
+*.sql
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
